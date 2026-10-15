@@ -1,0 +1,2 @@
+method,best_k,space,native_criterion,native_criterion_value,mean_jaccard,minimum_cluster_jaccard,resample_success_rate,successful_resamples,requested_resamples,fisher_p_post_freeze,eligible_multicluster,selection_mode,configured_method
+FCM,2,Full 17D (m=1.5),Xie-Beni (lower; k>=2),16.245187800542478,0.9243535375140791,0.91793039391826,0.96,192,200,0.4754762066961577,TRUE,configured,FCM

@@ -1,0 +1,16 @@
+panel_name,panel,profile,condition,n_total,n_hcc,n_cirrhosis,n_stage1_flags_removed
+cytokines,Cytokines,Food-diverse,A_excluded,42,10,32,1
+cytokines,Cytokines,Food-diverse,B_full,43,10,33,0
+cytokines,Cytokines,Food-limited,A_excluded,55,9,46,2
+cytokines,Cytokines,Food-limited,B_full,57,9,48,0
+cytokines,Cytokines,All (unstratified),C_full_cohort,142,29,113,0
+small_molecules,Small Molecules,Food-diverse,A_excluded,42,10,32,1
+small_molecules,Small Molecules,Food-diverse,B_full,43,10,33,0
+small_molecules,Small Molecules,Food-limited,A_excluded,55,8,47,2
+small_molecules,Small Molecules,Food-limited,B_full,57,9,48,0
+small_molecules,Small Molecules,All (unstratified),C_full_cohort,141,29,112,0
+lipoproteins,Lipoproteins,Food-diverse,A_excluded,41,10,31,2
+lipoproteins,Lipoproteins,Food-diverse,B_full,43,10,33,0
+lipoproteins,Lipoproteins,Food-limited,A_excluded,56,9,47,1
+lipoproteins,Lipoproteins,Food-limited,B_full,57,9,48,0
+lipoproteins,Lipoproteins,All (unstratified),C_full_cohort,142,29,113,0

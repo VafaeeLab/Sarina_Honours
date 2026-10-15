@@ -35,6 +35,10 @@ assert_columns <- function(data, required, label = deparse(substitute(data))) {
   invisible(TRUE)
 }
 
+as_numeric_clean <- function(x) {
+  suppressWarnings(as.numeric(as.character(x)))
+}
+
 ensure_dir <- function(path) {
   if (!dir.exists(path)) {
     dir.create(path, recursive = TRUE, showWarnings = FALSE)

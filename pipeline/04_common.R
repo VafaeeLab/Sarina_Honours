@@ -1,6 +1,6 @@
 # =============================================================================
 # 04_common.R
-# Shared setup for all 04x deep-dive sub-scripts.
+# Shared setup for all 04x sub-scripts.
 #
 # Each 04x script sources this file AFTER sourcing config.R and utils.R.
 # This file loads frozen upstream objects, defines shared helpers, and sets

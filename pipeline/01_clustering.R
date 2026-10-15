@@ -1404,6 +1404,14 @@ for (method_name in names(candidate_objects)) {
       size = 2.6, alpha = 0.82, colour = "white", stroke = 0.4
     ) +
     scale_shape_manual(values = c("Cirrhosis" = 21, "HCC" = 24)) +
+    guides(
+      fill = guide_legend(
+        override.aes = list(shape = 22, colour = "grey30", stroke = 0.3, size = 4)
+      ),
+      shape = guide_legend(
+        override.aes = list(fill = "grey50", colour = "grey30", stroke = 0.3, size = 4)
+      )
+    ) +
     labs(
       title = paste0("PCA projection of the ", method_name, " candidate"),
       subtitle = paste0(
@@ -1974,6 +1982,14 @@ if (is_fcm) {
     ggplot2::scale_shape_manual(
       values = c("Cirrhosis" = 16, "HCC" = 17),
       name = "Disease status"
+    ) +
+    ggplot2::guides(
+      colour = ggplot2::guide_legend(
+        override.aes = list(size = 4, alpha = 1, shape = 16)
+      ),
+      shape = ggplot2::guide_legend(
+        override.aes = list(size = 4, alpha = 1, colour = "grey30")
+      )
     )
 } else {
   p_pca_scatter <- ggplot2::ggplot(
@@ -1995,6 +2011,14 @@ if (is_fcm) {
     ggplot2::scale_shape_manual(
       values = c("Cirrhosis" = 16, "HCC" = 17),
       name = "Disease status"
+    ) +
+    ggplot2::guides(
+      colour = ggplot2::guide_legend(
+        override.aes = list(size = 4, alpha = 1, shape = 16)
+      ),
+      shape = ggplot2::guide_legend(
+        override.aes = list(size = 4, alpha = 1, colour = "grey30")
+      )
     )
 }
 

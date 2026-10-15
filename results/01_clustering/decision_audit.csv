@@ -1,0 +1,6 @@
+Method,Space,Best k,Criterion used,Criterion value,Stability (Jaccard),Fisher p
+Ward.D2,Full 17D,1,Gap (1-SE),1.212,—,—
+K-means,PCA 4D,2,Gap; PCs→stability,1.091,0.929,0.629
+GMM,PCA 4D,2,ICL; PCs→stability,-1702.6,0.682,1.000
+FCM,Full 17D (m=1.5),2,Xie-Beni (lower; k>=2),16.245,0.924,0.475
+UMAP+Km,UMAP 2D (10/0.15),2,Silh.; params→stability (k≥2),0.434,0.774,1.000

@@ -1,0 +1,37 @@
+cluster,diet_profile,food_group,food_label,mean_z
+1,Food-diverse,discretionary_sweet_adj,Discretionary - sweet,-0.470136082328116
+1,Food-diverse,processed_meat_adj,Processed meat,-0.4519784071229088
+1,Food-diverse,discretionary_savoury_adj,Discretionary - savoury,-0.44128761738138206
+1,Food-diverse,alcohol_adj,Alcohol,-0.22915996288863577
+1,Food-diverse,dairy_and_alternatives_adj,Dairy & alternatives,-0.2095428805579175
+1,Food-diverse,saturated_adj,Saturated fats & oils,-0.1971199254805191
+1,Food-diverse,grains_cereals_adj,Grains & cereals,0.06190894347876596
+1,Food-diverse,soy_plant_adj,Soy & plant-based foods,0.16541784100286047
+1,Food-diverse,red_meat_adj,Red meat,0.25245232402108797
+1,Food-diverse,poultry_adj,Poultry,0.2527907264541034
+1,Food-diverse,nuts_adj,Nuts,0.3319654116914142
+1,Food-diverse,legumes_adj,Legumes,0.33394562862245863
+1,Food-diverse,eggs_adj,Eggs,0.3909689588424099
+1,Food-diverse,seafood_adj,Seafood,0.3998821582858743
+1,Food-diverse,unsaturated_adj,Unsaturated fats & oils,0.47779470107447847
+1,Food-diverse,healthy_drinks_adj,"Water, tea & coffee",0.48720061011310195
+1,Food-diverse,fruit_adj,Fruit,0.5187172795650183
+1,Food-diverse,veg_adj,Vegetables,0.6488692415603456
+2,Food-limited,veg_adj,Vegetables,-0.5229692394665473
+2,Food-limited,fruit_adj,Fruit,-0.4180706432315069
+2,Food-limited,healthy_drinks_adj,"Water, tea & coffee",-0.3926691484493665
+2,Food-limited,unsaturated_adj,Unsaturated fats & oils,-0.38508826653763845
+2,Food-limited,seafood_adj,Seafood,-0.322293082797571
+2,Food-limited,eggs_adj,Eggs,-0.3151093101117935
+2,Food-limited,legumes_adj,Legumes,-0.2691502081434742
+2,Food-limited,nuts_adj,Nuts,-0.26755421240800503
+2,Food-limited,poultry_adj,Poultry,-0.2037417795301733
+2,Food-limited,red_meat_adj,Red meat,-0.20346903727072815
+2,Food-limited,soy_plant_adj,Soy & plant-based foods,-0.1333218420023053
+2,Food-limited,grains_cereals_adj,Grains & cereals,-0.04989676041572179
+2,Food-limited,saturated_adj,Saturated fats & oils,0.1588727757604172
+2,Food-limited,dairy_and_alternatives_adj,Dairy & alternatives,0.1688853067183211
+2,Food-limited,alcohol_adj,Alcohol,0.18469608949233363
+2,Food-limited,discretionary_savoury_adj,Discretionary - savoury,0.3556646468446961
+2,Food-limited,processed_meat_adj,Processed meat,0.3642811042483138
+2,Food-limited,discretionary_sweet_adj,Discretionary - sweet,0.3789156484435573

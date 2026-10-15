@@ -1,0 +1,3 @@
+diet_profile,n_total,n_HCC,n_Cirrhosis,HCC_percent,Cirrhosis_percent,mean_max_membership,highest_mean_z_foods,lowest_mean_z_foods
+Food-diverse,54,11,43,20.37037037037037,79.62962962962963,0.5845048020154251,"Vegetables, Fruit, Water, tea & coffee, Unsaturated fats & oils, Seafood","Discretionary - sweet, Processed meat, Discretionary - savoury, Alcohol, Dairy & alternatives"
+Food-limited,67,10,57,14.925373134328359,85.07462686567165,0.58394124991349206,"Discretionary - sweet, Processed meat, Discretionary - savoury, Alcohol, Dairy & alternatives","Vegetables, Fruit, Water, tea & coffee, Unsaturated fats & oils, Seafood"

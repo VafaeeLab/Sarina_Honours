@@ -15,7 +15,7 @@ MASTER_SEED <- 42L
 # 2. Project directories
 # -----------------------------------------------------------------------------
 
-PROJECT_ROOT <- here::here()
+PROJECT_ROOT <- "."
 
 DATA_DIR <- file.path(PROJECT_ROOT, "data")
 
