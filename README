@@ -1,0 +1,1505 @@
+# MAFLD Dietary Profiles and Multi-Omics Analysis Pipeline
+
+## Overview
+
+This repository contains the analysis pipeline used to investigate dietary profiles and molecular characteristics associated with hepatocellular carcinoma (HCC) and cirrhosis in participants with metabolic dysfunction-associated fatty liver disease (MAFLD).
+
+The analysis has two main aims:
+
+### Aim 1 — Dietary profile identification
+
+Identify reproducible dietary profiles using energy-adjusted food-frequency questionnaire (FFQ) data.
+
+Dietary clustering is performed independently of HCC status. Multiple unsupervised clustering methods are compared, with the final dietary solution carried forward to Aim 2.
+
+The frozen primary dietary solution is:
+
+- **Method:** Fuzzy c-means (FCM)
+- **Number of clusters:** `k = 2`
+- **Fuzziness parameter:** `m = 1.5`
+- **Profile labels:** `Food-diverse` and `Food-limited`
+
+### Aim 2 — Molecular characteristics of dietary profiles and HCC
+
+Aim 2 integrates three molecular panels:
+
+- Cytokines
+- Small molecules
+- Lipoproteins
+
+The analysis examines:
+
+1. HCC versus cirrhosis biomarker differences within each dietary profile.
+2. Global multivariate molecular differences.
+3. Molecular differences between Food-diverse and Food-limited participants.
+4. Cytokine heterogeneity between dietary profiles.
+5. Micronutrient associations with cytokine variation.
+6. Exploratory cytokine-defined molecular subgroups.
+7. Biomarker × dietary-profile interaction analyses.
+8. Exploratory longitudinal small-molecule changes.
+
+---
+
+# Repository structure
+
+A typical project structure is:
+
+```text
+project/
+│
+├── config.R
+├── utils.R
+│
+├── 0_preprocess.R
+├── 01_clustering.R
+├── 02_stage1_screen.R
+├── 03_biomarker.R
+├── 04_deep_dive.R
+│
+├── Diet_Data_MAFLD_Only.xlsx
+├── goldberg_reporter_classification.csv
+│
+├── Cytokines_Cirrhosis.csv
+├── Cytokines_HCC.csv
+├── SmallMolecules_Cirrhosis.csv
+├── SmallMolecules_HCC.csv
+├── Lipoproteins(Cirrhosis).csv
+├── Lipoproteins(HCC).csv
+│
+├── Clin_Path_MAFLD_Only(Cirrhosis).csv
+├── Clin_Path_MAFLD_Only(HCC).csv
+│
+├── intermediate/
+├── results/
+└── figures/
+```
+
+The exact filenames of Stages 01 and 02 may differ between working versions of the repository. The important feature is the order of execution and the RDS contracts described below.
+
+---
+
+# Software
+
+Analyses are performed in **R**.
+
+Main packages used across the pipeline include:
+
+```r
+install.packages(c(
+  "tidyverse",
+  "readxl",
+  "psych",
+  "cluster",
+  "e1071",
+  "mclust",
+  "uwot",
+  "vegan"
+))
+```
+
+Individual scripts check or load the packages required for their analyses.
+
+---
+
+# Reproducibility
+
+The pipeline uses a fixed master seed:
+
+```r
+MASTER_SEED <- 42L
+```
+
+Important settings are stored centrally in:
+
+```text
+config.R
+```
+
+Reusable functions should be placed in:
+
+```text
+utils.R
+```
+
+The main intermediate objects are saved as:
+
+```text
+intermediate/
+├── 00_preprocessed_diet.rds
+├── 01_clustering.rds
+├── 02_stage1_screen.rds
+├── 03_biomarker.rds
+└── 04_deep_dive.rds
+```
+
+Each downstream stage reads frozen outputs from the preceding stages rather than reconstructing them independently.
+
+---
+
+# Analysis populations
+
+## Dietary cohort
+
+Participants require usable dietary data.
+
+Low-energy reporters are excluded from the primary dietary analysis before food-group imputation, energy adjustment and clustering.
+
+Low-energy reporting is defined using:
+
+```text
+EI:BMR < 0.90
+```
+
+where resting energy expenditure is estimated using the Mifflin–St Jeor equation.
+
+The primary LER-excluded dietary cohort contains approximately 121 participants before further molecular availability restrictions.
+
+## Diet-linked molecular cohort
+
+The main Aim 2 cohort consists of participants who:
+
+- are eligible for the dietary analysis;
+- have a frozen dietary-profile assignment; and
+- have usable baseline molecular measurements.
+
+Dietary-profile assignments are not recalculated during Aim 2.
+
+## Broader molecular reference cohort
+
+A broader baseline molecular cohort is also constructed without requiring dietary-clustering eligibility.
+
+This cohort is used as an unstratified reference analysis and should not be interpreted as a controlled comparison demonstrating that dietary stratification improves biomarker discovery.
+
+---
+
+# Stage 0 — Dietary preprocessing
+
+## Purpose
+
+Convert raw FFQ responses into an energy-adjusted, standardised food-group matrix suitable for unsupervised clustering.
+
+## 0.1 Participant ID standardisation
+
+Participant identifiers are normalised by:
+
+- converting to character;
+- removing non-breaking spaces;
+- trimming/collapsing whitespace; and
+- converting text to uppercase.
+
+The same ID convention is used across dietary, clinical and molecular datasets.
+
+## 0.2 Low-energy reporter exclusion
+
+Reported energy intake is converted from kJ to kcal:
+
+```text
+Energy (kcal/day) = Energy (kJ/day) / 4.184
+```
+
+Resting energy expenditure is estimated using the Mifflin–St Jeor equation:
+
+```text
+REE = 9.99 × weight + 6.25 × height − 4.92 × age + s
+```
+
+where:
+
+```text
+s = +5   for males
+s = -161 for females
+```
+
+The energy-intake ratio is:
+
+```text
+EI:BMR = reported energy intake / estimated REE
+```
+
+Participants with:
+
+```text
+EI:BMR < 0.90
+```
+
+are classified as low-energy reporters and excluded from the primary dietary analysis.
+
+## 0.3 FFQ response conversion
+
+Categorical FFQ responses are converted to estimated daily frequencies.
+
+Examples include:
+
+```text
+Never        -> 0
+1–3/month    -> midpoint / 30.4375
+1–2/week     -> midpoint / 7
+Once/day     -> 1
+2–3/day      -> midpoint
+```
+
+Blank, missing or unrecognised responses remain missing rather than being interpreted as zero intake.
+
+## 0.4 Missing FFQ values
+
+Missing FFQ item frequencies are replaced with the median observed value for that item across the retained dietary cohort.
+
+Imputation is performed without reference to HCC status.
+
+## 0.5 Food-group construction
+
+FFQ items are mapped to 18 mutually exclusive food groups:
+
+1. Vegetables
+2. Legumes
+3. Fruit
+4. Grains and cereals
+5. Dairy and alternatives
+6. Red meat
+7. Processed meat
+8. Poultry
+9. Seafood
+10. Eggs
+11. Nuts
+12. Sweet discretionary foods
+13. Savoury discretionary foods
+14. Alcohol
+15. Saturated fats and oils
+16. Unsaturated fats and oils
+17. Water, tea and coffee
+18. Soy and plant-based foods
+
+For participant `i` and food group `g`:
+
+```text
+Food-group score(i,g)
+    = mean daily frequency of the FFQ items belonging to group g
+```
+
+These scores represent average item-consumption frequency, not grams or total servings.
+
+## 0.6 Willett energy adjustment
+
+Each food group is adjusted separately for total energy intake using the residual method.
+
+For food group `g`:
+
+```text
+Food group = beta0 + beta1 × total energy + error
+```
+
+The adjusted value is:
+
+```text
+Adjusted food-group score
+    = regression residual
+    + predicted food-group score at mean cohort energy intake
+```
+
+This reduces variation attributable solely to differences in total energy consumption.
+
+## 0.7 Z-standardisation
+
+Each adjusted food group is converted to:
+
+```text
+z = (x - mean(x)) / SD(x)
+```
+
+The final clustering matrix therefore contains variables with approximately:
+
+```text
+mean = 0
+SD   = 1
+```
+
+This prevents food groups with larger numerical variances from dominating Euclidean-distance-based clustering.
+
+---
+
+# Stage 1 — Dietary clustering
+
+## Purpose
+
+Identify dietary profiles without using HCC status.
+
+Five clustering approaches are compared:
+
+- Ward's hierarchical clustering
+- K-means
+- Gaussian mixture modelling
+- Fuzzy c-means
+- UMAP followed by k-means
+
+All methods use the same frozen energy-adjusted and z-standardised food-group matrix.
+
+## Parameter selection
+
+Different internal criteria are used because the clustering methods have different statistical structures.
+
+| Method | Main selection criterion |
+|---|---|
+| Ward hierarchical clustering | Gap statistic |
+| K-means | Gap statistic |
+| Gaussian mixture model | Integrated completed likelihood |
+| Fuzzy c-means | Xie–Beni index |
+| UMAP + k-means | Silhouette width |
+
+Candidate cluster numbers are evaluated up to:
+
+```r
+CLUSTER_K_MAX <- 5L
+```
+
+HCC status is never used to choose the clustering algorithm, number of clusters or tuning parameters.
+
+## Stability assessment
+
+Cluster stability is assessed using repeated 80% subsamples without replacement.
+
+Current configuration:
+
+```r
+CLUSTER_SUBSAMPLE_FRACTION <- 0.80
+CLUSTER_TUNE_RESAMPLES     <- 40L
+CLUSTER_FINAL_RESAMPLES    <- 200L
+```
+
+Clusters from each subsample are matched to the reference clusters using Jaccard similarity:
+
+```text
+J(A,B) = |A intersection B| / |A union B|
+```
+
+The following are retained:
+
+- mean Jaccard similarity;
+- minimum cluster-specific Jaccard similarity; and
+- proportion of successful resampled fits.
+
+Agreement between clustering methods is also evaluated using the adjusted Rand index (ARI).
+
+## Frozen primary dietary solution
+
+The final solution carried into Aim 2 is:
+
+```r
+PRIMARY_CLUSTER_METHOD <- "FCM"
+FCM_K                  <- 2L
+FCM_M                  <- 1.5
+```
+
+Participants are assigned to the cluster with the largest fuzzy membership value.
+
+Maximum membership is retained as a measure of assignment certainty.
+
+## Dietary profile labels
+
+The clusters are labelled after model fitting using their food-group characteristics.
+
+The profile with relatively greater intake of a broad range of nutrient-dense food groups is labelled:
+
+```text
+Food-diverse
+```
+
+The second profile is labelled:
+
+```text
+Food-limited
+```
+
+These labels describe relative patterns within this cohort and are not intended to represent externally validated diet-quality scores.
+
+HCC status is examined only after the clustering solution has been frozen.
+
+---
+
+# Stage 2 — Molecular preprocessing and outlier screening
+
+## Molecular panels
+
+Three baseline molecular panels are analysed:
+
+```text
+Cytokines
+Small molecules
+Lipoproteins
+```
+
+Only Visit 1 measurements are used for the main cross-sectional analyses.
+
+```r
+OMICS_VISIT <- 1L
+```
+
+## 2.1 Feature quality control
+
+Each panel is processed separately.
+
+The pipeline:
+
+1. Converts analyte columns to numeric.
+2. Removes participants with entirely missing panel measurements.
+3. Removes features with more than 30% missingness.
+4. Applies panel-specific transformation.
+5. Median-imputes remaining missing measurements.
+6. Removes features with zero or invalid variance.
+
+The maximum allowed feature missingness is:
+
+```r
+STAGE1_MAX_FEATURE_MISSING <- 0.30
+```
+
+## 2.2 Cytokine transformation
+
+Cytokines are transformed using:
+
+```text
+log1p(x) = ln(1 + x)
+```
+
+The transformation occurs **before median imputation**.
+
+Current configuration:
+
+```r
+FORCE_LOG_PANELS <- c("cytokines")
+```
+
+Therefore:
+
+```text
+Cytokines:
+raw -> log1p -> median imputation
+
+Small molecules:
+raw -> median imputation
+
+Lipoproteins:
+raw -> median imputation
+```
+
+The purpose of `log1p()` is to reduce extreme right-skew and the influence of very large cytokine measurements.
+
+It is not assumed to make every cytokine normally distributed.
+
+Negative cytokine concentrations are not compatible with the current `log1p()` workflow and should trigger review rather than being silently transformed.
+
+## 2.3 Median imputation
+
+For each retained feature, a missing value is replaced by the median of the observed values for that feature.
+
+For cytokines, the median is calculated after `log1p()` transformation.
+
+Transformations and imputation are performed before splitting participants according to HCC status or dietary profile.
+
+Therefore HCC status does not determine imputation values.
+
+## 2.4 Z-standardisation
+
+Formal Euclidean-distance analyses use:
+
+```text
+z = (x - mean(x)) / SD(x)
+```
+
+within the relevant analysis dataset.
+
+Feature-level biomarker comparisons retain the transformed/imputed measurement scale unless a model explicitly standardises the feature.
+
+---
+
+# Multivariate outlier detection
+
+Outliers are identified independently within each molecular panel.
+
+The statistical outlier screen is performed **after the relevant transformation and median imputation**.
+
+For cytokines this means:
+
+```text
+raw cytokine
+    -> log1p
+    -> median imputation
+    -> PCA
+    -> Hotelling T²
+```
+
+## PCA
+
+Outlier PCA uses:
+
+```text
+mean-centred data
+no variance scaling
+```
+
+The number of retained principal components is selected using covariance-based parallel analysis.
+
+Current setting:
+
+```r
+STAGE1_PA_ITER <- 1000L
+```
+
+## Hotelling's T²
+
+For participant `i`:
+
+```text
+T²_i = sum over retained PCs of:
+       (PC score_i)^2 / corresponding eigenvalue
+```
+
+A large T² indicates that the participant is unusually distant from the multivariate centre across the retained PCA dimensions.
+
+Participants above the **99% F-based control limit** are flagged as multivariate outliers.
+
+```r
+STAGE1_HOTELLING_CONFIDENCE <- 0.99
+```
+
+Q-residuals are not used as an additional exclusion criterion in the current primary biomarker screen.
+
+Outlier status is determined before biomarker testing.
+
+---
+
+# Aim 2 analysis conditions
+
+Three analysis conditions are used.
+
+| Condition | Population | Outlier handling | Purpose |
+|---|---|---|---|
+| **A — `A_excluded`** | Within each dietary profile | Panel-specific outliers excluded | Primary within-profile biomarker analysis |
+| **B — `B_full`** | Same diet-linked cohort | Outliers retained | Outlier sensitivity analysis |
+| **C — `C_full_cohort`** | Broader molecular cohort, unstratified | Outliers retained | Reference analysis |
+
+Condition C differs from Conditions A/B in eligibility and sample composition.
+
+It is therefore treated as a descriptive reference rather than a controlled test of whether dietary stratification improves biomarker discovery.
+
+---
+
+# Stage 3 — Within-profile HCC vs cirrhosis biomarker analysis
+
+## Purpose
+
+Test whether individual molecular features differ between HCC and cirrhosis within each frozen dietary profile.
+
+The analysis is performed independently for:
+
+```text
+Cytokines
+Small molecules
+Lipoproteins
+```
+
+and independently within:
+
+```text
+Food-diverse
+Food-limited
+```
+
+## Wilcoxon rank-sum test
+
+For each feature, HCC and cirrhosis are compared using a two-sided Wilcoxon rank-sum test.
+
+The implementation uses:
+
+```r
+wilcox.test(
+  x_hcc,
+  x_cirr,
+  exact = FALSE,
+  correct = TRUE
+)
+```
+
+Therefore:
+
+```text
+exact = FALSE
+```
+
+uses the asymptotic normal approximation, while:
+
+```text
+correct = TRUE
+```
+
+applies the standard 0.5 continuity correction.
+
+At least three participants are required in each disease group.
+
+## Reported feature-level statistics
+
+For each feature the pipeline records:
+
+- number of HCC participants;
+- number of cirrhosis participants;
+- median in HCC;
+- median in cirrhosis;
+- HCC-minus-cirrhosis median difference;
+- Cliff's delta;
+- Wilcoxon p-value; and
+- FDR-adjusted p-value.
+
+## Cliff's delta
+
+Cliff's delta is:
+
+```text
+delta =
+(number of HCC > cirrhosis pairwise comparisons
+ - number of HCC < cirrhosis pairwise comparisons)
+/
+(total number of HCC-cirrhosis pairwise comparisons)
+```
+
+Interpretation:
+
+```text
+delta > 0  -> feature tends to be higher in HCC
+delta < 0  -> feature tends to be lower in HCC
+delta = 0  -> no tendency in either direction
+```
+
+## Multiple testing
+
+Benjamini–Hochberg false-discovery-rate correction is applied within each:
+
+```text
+panel × dietary profile × analysis condition
+```
+
+family.
+
+The primary screening threshold is:
+
+```r
+FDR_THRESHOLD <- 0.10
+```
+
+`FDR < 0.05` may additionally be reported where relevant.
+
+## Covariate-adjusted models
+
+Features with:
+
+```text
+FDR < 0.10
+```
+
+are carried forward to logistic regression.
+
+HCC is coded:
+
+```text
+HCC       = 1
+Cirrhosis = 0
+```
+
+Two separate models are fitted:
+
+```text
+Model 1:
+logit[P(HCC)] = beta0 + beta1 × feature_z + beta2 × age_z
+
+Model 2:
+logit[P(HCC)] = beta0 + beta1 × feature_z + beta2 × BMI_z
+```
+
+Age and BMI are therefore **not simultaneously included** in these primary feature-level follow-up models.
+
+The feature and corresponding covariate are z-standardised within each complete-case model dataset.
+
+The feature odds ratio therefore represents the change in HCC odds associated with a **one-standard-deviation increase in the molecular feature**.
+
+Approximate 95% Wald confidence intervals are calculated as:
+
+```text
+exp(beta ± 1.96 × SE)
+```
+
+Model sample size and convergence are retained.
+
+---
+
+# Stage 4 — Multivariate and exploratory Aim 2 analyses
+
+`04_deep_dive.R` performs downstream analyses using frozen upstream data.
+
+Nothing in this stage feeds back into dietary clustering, molecular preprocessing or the primary biomarker screen.
+
+---
+
+## 4.1 PCA visualisation
+
+PCA biplots are used descriptively to visualise multivariate molecular variation.
+
+For the primary-condition PCA:
+
+```text
+centre = TRUE
+scale  = FALSE
+```
+
+This matches the representation used for the multivariate outlier screen.
+
+PCA is descriptive and is not used as evidence of statistical group separation by itself.
+
+---
+
+## 4.2 HCC vs cirrhosis PERMANOVA
+
+For formal distance-based analysis, each retained feature is z-standardised.
+
+Euclidean distance is:
+
+```text
+d(i,j) = sqrt[ sum_k (z_ik - z_jk)^2 ]
+```
+
+PERMANOVA tests whether the multivariate molecular centroids of HCC and cirrhosis differ.
+
+Analyses are performed:
+
+- within each dietary profile under Conditions A and B; and
+- in the unstratified reference cohort under Condition C.
+
+Current number of permutations:
+
+```r
+DEEP_DIVE_PERMUTATIONS <- 9999L
+```
+
+Reported statistics include:
+
+```text
+pseudo-F
+R²
+permutation p-value
+BH-FDR
+```
+
+`R²` represents the proportion of multivariate variation explained by disease status.
+
+---
+
+## 4.3 PERMDISP
+
+PERMDISP tests whether groups differ in multivariate dispersion rather than location.
+
+It compares participants' distances from the spatial median of their group.
+
+PERMDISP also uses:
+
+```text
+9,999 permutations
+```
+
+PERMANOVA and PERMDISP are interpreted together because apparent centroid separation can be affected by differences in within-group dispersion.
+
+---
+
+## 4.4 Adjusted PERMANOVA
+
+A complete-case sensitivity model tests disease status while simultaneously controlling for age and BMI:
+
+```text
+distance ~ disease status + age_z + BMI_z
+```
+
+The marginal contribution of disease status is tested.
+
+BH correction is applied separately across:
+
+```text
+unadjusted PERMANOVA tests
+PERMDISP tests
+adjusted PERMANOVA tests
+```
+
+---
+
+# Food-diverse vs Food-limited molecular comparison
+
+Aim 2 also asks whether the dietary profiles correspond to different molecular phenotypes.
+
+For every retained molecular feature:
+
+```text
+Food-diverse vs Food-limited
+```
+
+is compared using:
+
+- Wilcoxon rank-sum test;
+- median difference;
+- Cliff's delta; and
+- BH-FDR.
+
+Positive Cliff's delta indicates values tending to be higher in Food-diverse.
+
+Global molecular separation is additionally examined using PERMANOVA and PERMDISP.
+
+The central interpretation should consider both effect size and multiplicity-adjusted statistical evidence.
+
+---
+
+# Cytokine heterogeneity analysis
+
+Differences in cytokine variability between the dietary profiles are tested using the Brown–Forsythe test.
+
+For participant `i` in group `g`:
+
+```text
+absolute deviation_i
+    = |x_i - median(group g)|
+```
+
+An ANOVA is then performed on these absolute deviations.
+
+This is more robust to non-normality than comparing ordinary variances directly.
+
+## MAD
+
+The unscaled median absolute deviation is:
+
+```text
+MAD_g = median(|x_i - median_g|)
+```
+
+The reported variability ratio is:
+
+```text
+MAD ratio
+    = MAD(Food-diverse) / MAD(Food-limited)
+```
+
+Interpretation:
+
+```text
+MAD ratio > 1
+    -> greater variability in Food-diverse
+
+MAD ratio < 1
+    -> greater variability in Food-limited
+
+MAD ratio = 1
+    -> similar median absolute variability
+```
+
+BH-FDR is applied across cytokines within each dispersion analysis.
+
+The primary analysis retains the full diet-linked cohort, with outlier-excluded and covariate-residualised versions used as sensitivity analyses.
+
+---
+
+# Micronutrient analyses
+
+Eighteen micronutrients are evaluated:
+
+```text
+Retinol equivalents
+Thiamin
+Riboflavin
+Niacin equivalents
+Total folates
+Vitamin B6
+Vitamin B12
+Vitamin C
+Vitamin E
+Calcium
+Iodine
+Iron
+Magnesium
+Phosphorus
+Potassium
+Selenium
+Sodium
+Zinc
+```
+
+Each nutrient is energy-adjusted using the Willett residual approach.
+
+Missing nutrient values remain missing and analyses use the available complete observations.
+
+## Nutrients by dietary profile
+
+Food-diverse and Food-limited participants are compared using:
+
+```text
+Wilcoxon rank-sum test
+Cliff's delta
+BH-FDR across 18 nutrients
+```
+
+## Nutrients vs cytokine PCA
+
+PCA is performed on:
+
+```text
+log1p cytokines
+    -> median imputation
+    -> z-standardisation
+    -> PCA
+```
+
+Dietary profile, disease status and micronutrients are **not** used to construct the PCA.
+
+Associations between nutrients and cytokine PC1/PC2 are first assessed using Spearman rank correlations.
+
+Across:
+
+```text
+18 nutrients × 2 components = 36 tests
+```
+
+FDR is calculated both within component and across the full family, with the full-family correction used for the main interpretation.
+
+Adjusted linear models then use:
+
+```text
+PC score ~ nutrient_z + age + BMI + disease status + dietary profile
+```
+
+The nutrient coefficient represents the change in cytokine PC score associated with a one-SD increase in energy-adjusted nutrient intake.
+
+---
+
+# Priority nutrient-cytokine analysis
+
+A smaller exploratory cytokine set is constructed using evidence from:
+
+- Food-diverse vs Food-limited feature comparisons;
+- cytokine dispersion analyses; and
+- the largest absolute PC1/PC2 loadings.
+
+Within-profile HCC results are retained as contextual information but are not used to select the priority cytokine set.
+
+Each energy-adjusted nutrient is correlated with each priority cytokine using Spearman's rho.
+
+Adjusted models use:
+
+```text
+cytokine_z
+    ~ nutrient_z
+    + age
+    + BMI
+    + disease status
+    + dietary profile
+```
+
+Because cytokines are prioritised using the same dataset, these results are considered exploratory.
+
+---
+
+# Exploratory cytokine subgroup analysis
+
+A separate unsupervised analysis identifies molecular subgroups directly from cytokine measurements.
+
+This clustering is independent of the dietary FCM solution.
+
+## Cytokine preprocessing
+
+The subgroup analysis uses:
+
+```text
+raw cytokines
+    -> log1p
+    -> median imputation
+    -> z-standardisation
+```
+
+Feature eligibility is fixed using:
+
+```text
+maximum missingness = 30%
+non-zero variance
+```
+
+## Outlier screening
+
+Outliers are recalculated after cytokine transformation.
+
+The workflow is:
+
+```text
+log1p cytokines
+    -> median imputation
+    -> mean-centred PCA
+    -> parallel analysis
+    -> 99% Hotelling T² screen
+```
+
+Parallel analysis uses:
+
+```text
+1,000 iterations
+```
+
+For the primary cytokine subgroup analysis, the **union of participants flagged across any of the three molecular panels** is excluded.
+
+This differs from Condition A biomarker testing, where exclusions are panel-specific.
+
+The full diet-linked cohort with outliers retained is analysed as a sensitivity comparison.
+
+## Fuzzy c-means subgroup discovery
+
+FCM is fitted to candidate cluster numbers:
+
+```text
+k = 2, 3, 4, 5
+```
+
+with:
+
+```text
+m = 1.5
+```
+
+For each candidate `k`:
+
+```text
+50 random starts
+maximum 500 iterations
+```
+
+Invalid, empty or near-uniform membership solutions are rejected.
+
+The best valid fit is selected using the minimum Xie–Beni index:
+
+```text
+XB =
+within-cluster fuzzy dispersion
+/
+minimum squared separation between cluster centres
+```
+
+Lower Xie–Beni values indicate a preferable balance between compact clusters and well-separated centres.
+
+Dietary profile, HCC status, age and BMI are not used to construct the cytokine clusters.
+
+## Cytokine subgroup stability
+
+The selected solution is assessed using:
+
+```text
+100 repeated
+80% subsamples
+without replacement
+```
+
+The selected `k` and `m` remain fixed.
+
+Best-matching Jaccard similarities are reported by cluster.
+
+## Cytokine subgroup characterisation
+
+Participants are assigned to their highest-membership cytokine cluster for descriptive comparisons.
+
+Maximum fuzzy membership is retained as a measure of assignment certainty.
+
+When two clusters are selected, they are described as:
+
+```text
+Broadly higher cytokine profile
+Broadly lower cytokine profile
+```
+
+The descriptions are based on mean standardised cytokine centres rather than raw concentration thresholds.
+
+Relationships with external variables are examined only after the clusters have been constructed.
+
+Tests include:
+
+```text
+Cytokine subgroup × dietary profile -> Fisher's exact test
+Cytokine subgroup × HCC status      -> Fisher's exact test
+Age across cytokine subgroups       -> Kruskal–Wallis test
+BMI across cytokine subgroups       -> Kruskal–Wallis test
+Micronutrients across subgroups     -> Kruskal–Wallis + BH-FDR
+```
+
+These analyses characterise the derived cytokine clusters and do not feed back into clustering.
+
+---
+
+# Biomarker × dietary-profile interaction analysis
+
+A conditional exploratory analysis tests whether the association between a biomarker and HCC differs between dietary profiles.
+
+Candidate features must first satisfy:
+
+```text
+FDR < 0.10
+```
+
+in at least one within-profile Condition A or B biomarker screen.
+
+The interaction model is:
+
+```text
+logit[P(HCC)] =
+    beta0
+    + beta1 × biomarker_z
+    + beta2 × dietary profile
+    + beta3 × biomarker_z × dietary profile
+    + beta4 × age_z
+    + beta5 × BMI_z
+```
+
+The interaction coefficient `beta3` tests whether the biomarker-HCC association differs by dietary profile.
+
+The exponentiated interaction coefficient is interpreted as a ratio of biomarker odds ratios between profiles.
+
+A significant result in one dietary subgroup and a non-significant result in another is **not** treated as evidence of interaction unless the direct interaction term supports that conclusion.
+
+---
+
+# Longitudinal small-molecule case series
+
+A separate exploratory analysis evaluates within-person small-molecule changes among participants with paired baseline and later HCC-labelled measurements.
+
+Small molecules are placed on a baseline reference z-score scale.
+
+For each participant and metabolite:
+
+```text
+Delta z =
+    z at later HCC-labelled visit
+    - z at baseline Visit 1
+```
+
+Interpretation:
+
+```text
+Delta z > 0 -> increase from baseline
+Delta z < 0 -> decrease from baseline
+```
+
+Because the longitudinal sample is very small and some participants had prior HCC, this analysis is descriptive and should not be interpreted as demonstrating incident-HCC biomarkers or causal dietary effects.
+
+---
+
+# Output directories
+
+The pipeline separates machine-readable intermediate objects, numerical results and figures.
+
+```text
+intermediate/
+    Frozen RDS objects passed between pipeline stages
+
+results/
+    CSV result tables
+
+figures/
+    PNG/PDF figures for review, thesis and presentation
+```
+
+Typical result folders include:
+
+```text
+results/
+├── 01_clustering/
+├── 02_stage1_screen/
+├── 03_biomarker/
+└── 04_deep_dive/
+
+figures/
+├── 01_clustering/
+├── 02_stage1_screen/
+└── 04_deep_dive/
+```
+
+---
+
+# Pipeline execution
+
+Run the analysis from the project root so that relative paths in `config.R` resolve correctly.
+
+A typical execution order is:
+
+```bash
+Rscript 0_preprocess.R
+Rscript 01_clustering.R
+Rscript 02_stage1_screen.R
+Rscript 03_biomarker.R
+Rscript 04_deep_dive.R
+```
+
+If the local filenames for Stages 01 or 02 differ, preserve the same logical order.
+
+The required intermediate sequence is:
+
+```text
+Diet preprocessing
+        |
+        v
+00_preprocessed_diet.rds
+        |
+        v
+Dietary clustering
+        |
+        v
+01_clustering.rds
+        |
+        v
+Omics preprocessing + outlier screen
+        |
+        v
+02_stage1_screen.rds
+        |
+        v
+Within-profile biomarker analysis
+        |
+        v
+03_biomarker.rds
+        |
+        v
+Multivariate + exploratory deep dives
+        |
+        v
+04_deep_dive.rds
+```
+
+---
+
+# Key frozen analysis decisions
+
+The following decisions should not be changed silently after downstream analyses have been run:
+
+```text
+Master random seed                 = 42
+Primary dietary analysis           = LER excluded
+Number of food groups              = 18
+Food-group aggregation             = mean daily item frequency
+Dietary energy adjustment          = Willett residual method
+Dietary clustering method          = fuzzy c-means
+Dietary k                          = 2
+Dietary FCM m                      = 1.5
+Cytokine transformation            = log1p(x)
+Small-molecule transformation      = none in current primary pipeline
+Lipoprotein transformation         = none
+Omics missingness threshold        = 30%
+Omics imputation                   = feature median
+Outlier PC selection               = parallel analysis
+Parallel-analysis iterations       = 1,000
+Hotelling T² threshold             = 99%
+Primary biomarker FDR threshold    = 0.10
+PERMANOVA/PERMDISP permutations    = 9,999
+```
+
+Any deliberate changes to these settings should be made in `config.R`, documented, and followed by rerunning all affected downstream stages.
+
+---
+
+# Statistical interpretation
+
+The analyses are primarily exploratory and cross-sectional.
+
+Results should therefore be interpreted using:
+
+- effect sizes;
+- uncertainty;
+- FDR-adjusted p-values;
+- sample size;
+- outlier sensitivity; and
+- consistency across related analyses.
+
+Nominal `p < 0.05` findings are not treated as robust molecular discoveries when they do not survive the predefined multiplicity correction.
+
+Likewise:
+
+```text
+significant in one dietary profile
++
+not significant in the other dietary profile
+```
+
+does **not** establish effect modification.
+
+A direct biomarker × dietary-profile interaction test is required.
+
+The exploratory cytokine clusters describe structure observed in the current dataset and are not externally validated disease subtypes.
+
+Associations between diet, molecular measurements and HCC do not establish temporal or causal relationships.
+
+---
+
+# Important methodological notes
+
+## Why cytokines use log1p
+
+Many cytokines show substantial right-skew and extreme upper-tail observations.
+
+`log1p(x)`:
+
+```text
+ln(1 + x)
+```
+
+preserves zero while compressing large measurements.
+
+This reduces the influence of extreme observations on:
+
+- PCA;
+- Euclidean distances;
+- PERMANOVA;
+- PERMDISP;
+- Hotelling T²; and
+- molecular clustering.
+
+The aim is to reduce skewness and extreme influence, not to force normality.
+
+## Why outliers are screened after transformation
+
+Statistical multivariate outliers are defined in the same representation used for the downstream analysis.
+
+For cytokines, performing PCA/Hotelling T² before correcting strong right-skew could flag biologically plausible upper-tail observations primarily because of scale.
+
+Technical quality-control problems should still be identified on the raw data before transformation.
+
+## Why z-standardise distance analyses
+
+Euclidean distance is sensitive to feature scale.
+
+Without standardisation, features with large numerical variance can dominate the distance matrix.
+
+Z-standardisation gives each retained feature comparable variance for distance-based analyses.
+
+## Why use Wilcoxon tests
+
+Molecular measurements are frequently skewed and may contain extreme values.
+
+The Wilcoxon rank-sum test compares the relative distributions of two independent groups without requiring normally distributed measurements.
+
+## Why report Cliff's delta
+
+Statistical significance alone does not indicate the magnitude or direction of a difference.
+
+Cliff's delta provides a non-parametric effect size with a direct directional interpretation.
+
+## Why use FDR correction
+
+Many molecular features are tested simultaneously.
+
+Benjamini–Hochberg adjustment controls the expected proportion of false discoveries among findings declared significant, rather than interpreting each raw p-value independently.
+
+---
+
+# Quality-control checks before final analysis
+
+Before accepting a pipeline run, confirm that:
+
+```text
+[ ] Participant IDs are normalised consistently.
+[ ] Low-energy reporters are excluded from the primary dietary cohort.
+[ ] All 18 food groups are present.
+[ ] Energy-adjusted food-group variables have finite non-zero variance.
+[ ] Dietary clustering reproduces the frozen FCM k=2, m=1.5 solution.
+[ ] Only baseline Visit 1 omics are used for cross-sectional analyses.
+[ ] Cytokines are log1p-transformed before imputation.
+[ ] Small molecules and lipoproteins remain on their configured scales.
+[ ] Omics features with >30% missingness are removed.
+[ ] No retained feature has zero/invalid variance.
+[ ] Parallel analysis completes successfully.
+[ ] Hotelling T² flags are saved before biomarker testing.
+[ ] Condition A, B and C sample counts are recorded.
+[ ] FDR adjustment uses the intended statistical family.
+[ ] Logistic models record complete-case n and convergence.
+[ ] Random seeds and permutation counts are fixed.
+[ ] Intermediate RDS files are saved successfully.
+```
+
+---
+
+# References for core methods
+
+Key methodological references include:
+
+- Benjamini Y, Hochberg Y. Controlling the false discovery rate: a practical and powerful approach to multiple testing. *Journal of the Royal Statistical Society: Series B*. 1995.
+- Anderson MJ. A new method for non-parametric multivariate analysis of variance. *Austral Ecology*. 2001.
+- Anderson MJ. Distance-based tests for homogeneity of multivariate dispersions. *Biometrics*. 2006.
+- Mifflin MD et al. A new predictive equation for resting energy expenditure in healthy individuals. *American Journal of Clinical Nutrition*. 1990.
+- Willett WC, Stampfer MJ. Total energy intake: implications for epidemiologic analyses. *American Journal of Epidemiology*. 1986.
+
+---
+
+# Summary
+
+The pipeline is intentionally staged so that downstream results cannot modify upstream preprocessing or clustering decisions.
+
+In simplified form:
+
+```text
+Raw dietary data
+      |
+      v
+LER exclusion
+      |
+      v
+FFQ coding -> 18 food groups
+      |
+      v
+Willett energy adjustment
+      |
+      v
+Z-standardisation
+      |
+      v
+Outcome-independent dietary clustering
+      |
+      v
+Frozen Food-diverse / Food-limited profiles
+      |
+      +---------------------------------------+
+      |                                       |
+      v                                       v
+Baseline molecular panels                Clinical covariates
+      |
+      v
+Feature QC
+      |
+      v
+Cytokines: log1p
+Small molecules/lipoproteins: configured raw scale
+      |
+      v
+Median imputation
+      |
+      v
+PCA + parallel analysis + Hotelling T²
+      |
+      v
+Frozen omics preprocessing/outlier flags
+      |
+      +-----------------------------+
+      |                             |
+      v                             v
+Within-profile biomarkers       Multivariate/deep-dive analyses
+      |                             |
+      v                             v
+Wilcoxon + Cliff's delta        PCA / PERMANOVA / PERMDISP
+BH-FDR                         Cytokine heterogeneity
+Logistic adjustment            Micronutrient associations
+                               Cytokine FCM subgroups
+                               Interaction analyses
+                               Longitudinal case series
+```
+
+The overall design maintains a strict separation between:
+
+```text
+dietary profile discovery,
+molecular preprocessing,
+primary biomarker testing,
+and exploratory downstream analyses.
+```
+
+This reduces outcome-driven analytical decisions and preserves traceability throughout the thesis workflow.
