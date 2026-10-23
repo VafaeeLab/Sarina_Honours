@@ -1162,7 +1162,7 @@ cat("PCA/UMAP and clustering are refitted in every subsample.\n")
 candidate_objects <- list(
   "Ward.D2" = list(
     method = "Ward.D2",
-    space = "Full 17D",
+    space = "Full 18D",
     best_k = ward_k,
     criterion = "Gap (1-SE)",
     criterion_value = ward_gap_value,
@@ -1190,7 +1190,7 @@ candidate_objects <- list(
   ),
   "FCM" = list(
     method = "FCM",
-    space = paste0("Full 17D (m=", fcm_m, ")"),
+    space = paste0("Full 18D (m=", fcm_m, ")"),
     best_k = fcm_k,
     criterion = "Xie-Beni (lower; k>=2)",
     criterion_value = fcm_xb_value,
