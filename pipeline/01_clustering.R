@@ -1310,7 +1310,7 @@ readr::write_csv(
 )
 
 # =============================================================================
-# PHASE 9 — SLIDE-READY TABLE FIGURE
+# PHASE 9 —  TABLE FIGURE
 # =============================================================================
 
 navy <- "#1A1A2E"
@@ -1368,12 +1368,12 @@ slide_table_grob <- arrangeGrob(
   padding = unit(1.5, "mm")
 )
 
-pdf(file.path(OUTPUT_DIR, "slide5_decision_audit_table.pdf"),
+pdf(file.path(OUTPUT_DIR, "decision_audit_table.pdf"),
     width = 7.1, height = 3.2)
 grid.draw(slide_table_grob)
 dev.off()
 
-png(file.path(OUTPUT_DIR, "slide5_decision_audit_table.png"),
+png(file.path(OUTPUT_DIR, "decision_audit_table.png"),
     width = 2130, height = 960, res = 300)
 grid.draw(slide_table_grob)
 dev.off()

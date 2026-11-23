@@ -25,11 +25,12 @@ source("pipeline/04_COMMON.R")
 set.seed(MASTER_SEED)
 
 # =============================================================================
-# 13. FEATURE x DIET-PROFILE INTERACTION ANALYSES
+# FEATURE x DIET-PROFILE INTERACTION ANALYSES
 # =============================================================================
 # These are explicitly exploratory. Candidate features are restricted to those
 # reaching FDR < FDR_THRESHOLD in at least one within-profile Condition A or B
 # analysis in 03_biomarker.R.
+# No features qualify in the current run, so no interaction models are produced
 # =============================================================================
 
 candidate_interaction_features <- biomarker$univariate %>%

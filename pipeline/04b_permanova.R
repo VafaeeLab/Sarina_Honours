@@ -64,7 +64,7 @@ run_multivariate_test <- function(
     n_hcc = n_hcc,
     n_cirrhosis = n_cirr,
     n_features = length(feature_cols),
-    standardised_for_distance = DEEP_DIVE_STANDARDISE_DISTANCE,
+    standardised_for_distance = DEEP_DIVE_STANDARDIZE_DISTANCE,
     permanova_F = NA_real_,
     permanova_R2 = NA_real_,
     permanova_p = NA_real_,
@@ -94,7 +94,7 @@ run_multivariate_test <- function(
     paste(panel_name, profile_label, condition)
   )
 
-  X_distance <- standardise_for_distance(X)
+  X_distance <- standardize_for_distance(X)
   distance <- stats::dist(X_distance, method = "euclidean")
 
   meta <- dat %>%

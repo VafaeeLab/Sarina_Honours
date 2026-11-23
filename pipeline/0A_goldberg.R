@@ -111,10 +111,10 @@ estimate_bmr_mifflin <- function(age, bmi, sex, height_m = NULL) {
 # =============================================================================
 # 4. GOLDBERG EI:BMR CLASSIFICATION
 # =============================================================================
-# Goldberg cutoff: EI:BMR < 1.1 => low-energy reporter (LER)
+# Goldberg cutoff: EI:BMR < 0.9 => low-energy reporter (LER)
 # =============================================================================
 
-GOLDBERG_CUTOFF <- 1.1
+GOLDBERG_CUTOFF <- 0.9
 
 classify_goldberg <- function(ei_kcal, bmr_kcal) {
   if (is.na(ei_kcal) || is.na(bmr_kcal) || bmr_kcal <= 0) {
